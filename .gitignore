@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.webp
+output/*
+!output/.gitkeep
+bg-image/*
+!bg-image/.gitkeep
+bg-music/*
+!bg-music/.gitkeep
