@@ -320,8 +320,9 @@ class QuoteVideoApp:
         processed = 0
         skipped   = 0
 
-        batch_num = _load_batch_number()
-        _save_batch_number(batch_num + 1)
+        batch_offset = _load_batch_number()          # first batch number for this run
+        batches_in_run = (len(quotes) + 2) // 3      # how many groups of 3 this run produces
+        _save_batch_number(batch_offset + batches_in_run)  # persist next run's starting batch
 
         for i, q in enumerate(quotes):
             text   = q["text"]
@@ -337,10 +338,11 @@ class QuoteVideoApp:
             bg_music = random.choice(musics)
             self.log(f"  img: {bg_img.name}  |  music: {bg_music.name}")
 
-            # Build filename: timestamp + batch + slot (cycles s1→s2→s3→s1…)
+            # Build filename: timestamp + batch + slot
             ts       = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            batch    = batch_offset + (i // 3)
             slot     = (i % 3) + 1
-            out_path = OUTPUT_DIR / f"{ts}_b{batch_num:03d}_s{slot}.mp4"
+            out_path = OUTPUT_DIR / f"{ts}_b{batch:04d}_s{slot}.mp4"
 
             try:
                 render_quote_video(

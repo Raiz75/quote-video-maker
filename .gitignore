@@ -9,6 +9,7 @@ __pycache__/
 *.jpg
 *.jpeg
 *.webp
+state.json
 output/*
 !output/.gitkeep
 bg-image/*
