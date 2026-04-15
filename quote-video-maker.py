@@ -18,9 +18,23 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 MUSIC_EXTS = {".mp3", ".wav", ".m4a", ".ogg", ".aac"}
 
+STATE_FILE = BASE_DIR / "state.json"
+
+def _load_batch_number() -> int:
+    """Read next_batch from state.json. Returns 1 if file doesn't exist."""
+    try:
+        data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        return int(data.get("next_batch", 1))
+    except Exception:
+        return 1
+
+def _save_batch_number(n: int):
+    """Persist next_batch to state.json."""
+    STATE_FILE.write_text(json.dumps({"next_batch": n}, indent=2), encoding="utf-8")
+
 MASTER_PROMPT = """You are a viral quote generator for social media (YouTube Shorts, TikTok, Reels).
 TASK:
-Generate 50 short, emotional, highly relatable quotes based on the theme.
+Generate 30 short, emotional, highly relatable quotes based on the theme.
 REQUIREMENTS:
 - Mix ORIGINAL quotes (author = null) and REAL attributed quotes (with correct author names).
 - At least 30% must be ORIGINAL quotes.
@@ -306,6 +320,9 @@ class QuoteVideoApp:
         processed = 0
         skipped   = 0
 
+        batch_num = _load_batch_number()
+        _save_batch_number(batch_num + 1)
+
         for i, q in enumerate(quotes):
             text   = q["text"]
             author = _format_author(q["author"])
@@ -320,9 +337,10 @@ class QuoteVideoApp:
             bg_music = random.choice(musics)
             self.log(f"  img: {bg_img.name}  |  music: {bg_music.name}")
 
-            # Build filename: timestamp only
-            ts   = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-            out_path = OUTPUT_DIR / f"{ts}.mp4"
+            # Build filename: timestamp + batch + slot (cycles s1→s2→s3→s1…)
+            ts       = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            slot     = (i % 3) + 1
+            out_path = OUTPUT_DIR / f"{ts}_b{batch_num:03d}_s{slot}.mp4"
 
             try:
                 render_quote_video(
