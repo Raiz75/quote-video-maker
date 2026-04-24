@@ -34,7 +34,7 @@ def _save_batch_number(n: int):
 
 MASTER_PROMPT = """You are a viral quote generator for social media (YouTube Shorts, TikTok, Reels).
 TASK:
-Generate 30 short, emotional, highly relatable quotes based on the theme.
+Generate 21 short, emotional, highly relatable quotes based on the theme.
 REQUIREMENTS:
 - Mix ORIGINAL quotes (author = null) and REAL attributed quotes (with correct author names).
 - At least 30% must be ORIGINAL quotes.
