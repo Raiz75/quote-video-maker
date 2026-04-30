@@ -11,6 +11,7 @@ __pycache__/
 *.webp
 state.json
 output/*
+yt-files/*
 !output/.gitkeep
 bg-image/*
 !bg-image/.gitkeep
