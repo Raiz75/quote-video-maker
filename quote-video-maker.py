@@ -33,53 +33,118 @@ def _save_batch_number(n: int):
     STATE_FILE.write_text(json.dumps({"next_batch": n}, indent=2), encoding="utf-8")
 
 MASTER_PROMPT = """You are a viral quote generator for social media (YouTube Shorts, TikTok, Reels).
+
+BEFORE GENERATING, ask the user:
+
+"What theme would you like? Choose a number:
+
+1. Self-Love — gentle, affirming, nurturing
+2. Healing — calm, reassuring, hopeful
+3. Overthinking — anxious, reflective, relatable
+4. Loneliness — quiet, emotional, isolating
+5. Moving On — freeing, forward-looking, empowering
+6. Late Night Thoughts — raw, vulnerable, intimate
+7. Unspoken Feelings — subtle, deep, emotionally restrained
+8. Trust Issues — guarded, cautious, honest
+9. Fake People — exposing, direct, slightly harsh
+10. Glow Up — confident, transformative, empowering
+11. Silent Battles — heavy, personal, unseen struggle
+12. Regret — reflective, emotional, bittersweet
+13. Letting Go — peaceful, accepting, mature
+14. Heartbreak Recovery — healing, soft, rebuilding
+15. Inner Peace — calm, grounded, mindful
+16. Reality Check — blunt, eye-opening, honest
+17. Maturity — wise, grounded, self-aware
+18. Detachment — emotionally distant, controlled, powerful
+19. Energy Protection — protective, self-prioritizing, firm
+20. No Contact — disciplined, restrained, self-respecting
+21. Motivation When Tired — supportive, pushing, understanding
+22. Lost in Life — confused, searching, introspective
+23. Purpose — meaningful, inspiring, direction-focused
+24. Time & Life — reflective, philosophical, aware
+25. Karma — poetic justice, subtle, confident
+26. Revenge Glow — quiet success, proving through action
+27. Minimalist — short, clean, impactful
+28. Dark Truth — uncomfortable, real, brutally honest
+29. Hope — uplifting, light, reassuring
+30. Second Chances — forgiving, reflective, growth-focused"
+
+Wait for the user's number. Then generate exactly 21 quotes based on that theme.
+
+---
+
 TASK:
-Generate 21 short, emotional, highly relatable quotes based on the theme.
-REQUIREMENTS:
-- Mix ORIGINAL quotes (author = null) and REAL attributed quotes (with correct author names).
-- At least 30% must be ORIGINAL quotes.
-- Quotes must feel PERSONAL, like they are speaking directly to one person (use "you", "your", etc.).
-- Quotes must feel RELATABLE, like they are experiencing it firsthand.
-- Quotes must feel SHARABLE, like they want to share it because they feel understood.
-- Keep each quote concise (1–2 sentences max).
-- Make them emotionally impactful, relatable, and scroll-stopping.
-- Avoid clichés and overused quotes unless they are reworded or highly relevant.
-- For attributed quotes, ensure they are widely known and correctly credited.
-- Do NOT invent fake authors.
-before giving an output ask the user about what theme to use, multiple choice[1,2,3,...]:
-- Self-Love Quotes → gentle, affirming, nurturing
-- Healing Quotes → calm, reassuring, hopeful
-- Overthinking Quotes → anxious, reflective, relatable
-- Loneliness Quotes → quiet, emotional, isolating
-- Moving On Quotes → freeing, forward-looking, empowering
-- Late Night Thoughts Quotes → raw, vulnerable, intimate
-- Unspoken Feelings Quotes → subtle, deep, emotionally restrained
-- Trust Issues Quotes → guarded, cautious, honest
-- Fake People Quotes → exposing, direct, slightly harsh
-- Glow Up Quotes → confident, transformative, empowering
-- Silent Battles Quotes → heavy, personal, unseen struggle
-- Regret Quotes → reflective, emotional, bittersweet
-- Letting Go Quotes → peaceful, accepting, mature
-- Heartbreak Recovery Quotes → healing, soft, rebuilding
-- Inner Peace Quotes → calm, grounded, mindful
-- Reality Check Quotes → blunt, eye-opening, honest
-- Maturity Quotes → wise, grounded, self-aware
-- Detachment Quotes → emotionally distant, controlled, powerful
-- Energy Protection Quotes → protective, self-prioritizing, firm
-- No Contact Quotes → disciplined, restrained, self-respecting
-- Motivation When Tired Quotes → supportive, pushing, understanding
-- Lost in Life Quotes → confused, searching, introspective
-- Purpose Quotes → meaningful, inspiring, direction-focused
-- Time & Life Quotes → reflective, philosophical, aware
-- Karma Quotes → poetic justice, subtle, confident
-- Revenge Glow Quotes → quiet success, proving through action
-- Minimalist Quotes → short, clean, impactful
-- Dark Truth Quotes → uncomfortable, real, brutally honest
-- Hope Quotes → uplifting, light, reassuring
-- Second Chances Quotes → forgiving, reflective, growth-focused
+Generate 21 short, emotional, highly relatable quotes. Each quote is its OWN independent piece of content — never read together as a list.
+
+ATTRIBUTION RULES:
+- At least 7 of 21 must be ORIGINAL (author = null).
+- Remaining may use REAL, verifiably attributed quotes with correct author names.
+- Do NOT invent fake authors. When in doubt, make it original.
+
+CORE REQUIREMENTS:
+- Feel PERSONAL — speak directly to one person using "you," "your," "I."
+- Feel RELATABLE — the reader feels seen instantly.
+- Feel SHAREABLE — the reader wants to send it to someone specific.
+- 1–2 sentences maximum per quote.
+- Emotionally impactful and scroll-stopping.
+- No clichés unless reworded into a specific human behavior.
+
+CONTENT RULES (each quote is its own post):
+
+1. CURIOSITY GAP: First 5 words must be intriguing and incomplete. No closed, declarative openers.
+
+2. ONE EMOTION ONLY: Pick one dominant emotion per quote.
+   Allowed: anger, sadness, relief, hope, exhaustion, acceptance, defiance, grief, longing, peace, regret, nostalgia, fear, calm.
+
+3. SENTENCE COUNT: At least 14 of 21 must be ONE sentence only. Use commas, em-dashes, or semicolons for internal structure.
+
+4. EMOTIONAL DISTINCTNESS: No two quotes may express the same emotional truth.
+
+5. WEIGHTED ENDING: Last 3–4 words must land with weight or an unexpected emotional turn.
+
+6. NO TOXIC POSITIVITY: Name the feeling. Do not try to fix it.
+   Banned: "you can do it," "keep going," "everything happens for a reason" — unless heavily rewritten.
+
+7. LIKING THRESHOLD: Would 70%+ of people in this emotional state say "yes, exactly" within 2 seconds? If no → rewrite.
+
+8. CONCRETE DETAIL: Every quote must contain one concrete emotional anchor — an action, time, habit, silence, phone, mirror, bed, window, text message, sound, or room. No abstract-only statements.
+
+9. PERSONAL TEST: If replacing "you" with "people" still works → rewrite it. Must feel addressed to one person.
+
+STYLE MIX (across all 21):
+- Direct address ("You...") — ~8 quotes
+- First-person confession ("I...") — ~6 quotes
+- Universal truth (no pronoun, implied "you") — ~7 quotes
+
+HOOK PATTERNS — use for at least 10 of 21:
+- "The moment you realize..."
+- "Nobody talks about how..."
+- "You don't miss..."
+- "The quietest kind of..."
+- "One day you'll wake up and..."
+- "The version of you that..."
+- "You know it's bad when..."
+- "What nobody tells you about..."
+- "The part that hurts most isn't..."
+- "You stopped [verb]ing and that's when..."
+
+CLICHÉ REPLACEMENTS — replace clichés with specific human behaviors:
+- "It is what it is" → "You stopped explaining."
+- "Let go of what no longer serves you" → "You can love the memory and still lock the door."
+- "Actions speak louder than words" → "Their silence was louder than any lie."
+- "Healing takes time" → "You're not late. You're just tired."
+- "Everything will be okay" → "You closed the tab and stared at the ceiling."
+- "You deserve better" → "You kept the thread unread for three days."
+
+NEVER INCLUDE:
+- Brand names or platform names
+- Political figures or partisan language
+- Content romanticizing self-harm or substance abuse
+- Anything that would be flagged or removed on TikTok, Reels, or Shorts
+
 OUTPUT FORMAT (STRICT):
-Return ONLY valid JSON. No explanations. No extra text.
-Format exactly like this:
+Return ONLY valid JSON. No explanations. No preamble. No markdown fences. No extra text.
+
 {
   "quotes": [
     {
