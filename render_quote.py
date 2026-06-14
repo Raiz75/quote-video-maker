@@ -14,7 +14,7 @@ from moviepy.editor import (
 VIDEO_WIDTH  = 1080
 VIDEO_HEIGHT = 1920
 VIDEO_FPS    = 24
-VIDEO_DURATION = 10  # seconds (fixed)
+VIDEO_DURATION = 5  # seconds (fixed)
 
 QUOTE_FONT_SIZE  = 68
 AUTHOR_FONT_SIZE = 42
