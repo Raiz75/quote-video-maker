@@ -71,16 +71,16 @@ Present this message exactly:
 29 Leadership — responsible, visionary, humble
 30 Minimalism & Simplicity — clean, clear, intentional"
 
-Wait for the user's number. Then generate exactly 21 quotes based on that theme.
+Wait for the user's number. Then generate exactly 14 quotes based on that theme.
 
 ---
 
 TASK:
-Generate 21 short, emotionally resonant, poetic, and highly shareable quotes. Each quote is its OWN independent piece of content — never read as a list.
+Generate 14 short, emotionally resonant, poetic, and highly shareable quotes. Each quote is its OWN independent piece of content — never read as a list.
 
 ATTRIBUTION RULES:
 
-At least 8 of 21 must be ORIGINAL (author = null).
+At least 5 of 14 must be ORIGINAL (author = null).
 Remaining may use REAL, verifiably attributed quotes with correct author names.
 Do NOT invent fake authors. When in doubt, mark as original.
 
@@ -95,7 +95,7 @@ Emotionally impactful and scroll-stopping.
 POETIC & RHYME RULES (STRICT):
 
 NATURAL POETRY OVER PROSE: Every quote must read like a line from a poem or song lyric — not a journal entry, not a motivational poster. Rhythm matters. Read it aloud; it must flow.
-SOFT RHYME ENCOURAGED: At least 10 of 21 must use one of these rhyme techniques:
+SOFT RHYME ENCOURAGED: At least 10 of 14 must use one of these rhyme techniques:
 
 End rhyme: last word rhymes with a word earlier in the same sentence.
 Internal rhyme: two words within the sentence share sound.
@@ -117,7 +117,7 @@ CONTENT RULES:
 CURIOSITY GAP: First 5 words must be intriguing and incomplete. No closed, declarative openers.
 ONE EMOTION ONLY: Pick one dominant emotion per quote.
 Allowed: anger, sadness, relief, hope, exhaustion, acceptance, defiance, grief, longing, peace, regret, nostalgia, fear, calm, pride, clarity.
-SENTENCE COUNT: At least 14 of 21 must be ONE sentence only. Use commas, em-dashes, or semicolons for internal structure.
+SENTENCE COUNT: At least 10 of 14 must be ONE sentence only. Use commas, em-dashes, or semicolons for internal structure.
 EMOTIONAL DISTINCTNESS: No two quotes may express the same emotional truth.
 WEIGHTED ENDING: Last 3–4 words must land with weight or an unexpected emotional turn.
 NO TOXIC POSITIVITY: Name the feeling. Do not try to fix it.
@@ -126,13 +126,13 @@ LIKING THRESHOLD: Would 70%+ of people in this emotional state say "yes, exactly
 CONCRETE DETAIL: Every quote must contain one concrete emotional anchor — an action, time, habit, silence, phone, mirror, bed, window, text, sound, room, street, meal, clock, or door. No abstract-only statements.
 PERSONAL TEST: If replacing "you" with "people" still works → rewrite it. Must feel addressed to one specific person.
 
-STYLE MIX (across all 21):
+STYLE MIX (across all 14):
 
 Direct address ("You...") — ~8 quotes
 First-person confession ("I...") — ~6 quotes
 Universal truth (no pronoun, implied "you") — ~7 quotes
 
-HOOK PATTERNS — use for at least 10 of 21:
+HOOK PATTERNS — use for at least 10 of 14:
 
 "The moment you realize..."
 "Nobody talks about how..."
@@ -429,7 +429,7 @@ class QuoteVideoApp:
             # Build filename: timestamp + batch + slot
             ts       = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
             batch    = batch_offset + (i // 3)
-            slot     = (i % 3) + 1
+            slot     = (i % 2) + 1
             out_path = OUTPUT_DIR / f"{ts}_b{batch:04d}_s{slot}.mp4"
 
             try:
