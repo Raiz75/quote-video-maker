@@ -7,13 +7,14 @@ import re
 import os
 from pathlib import Path
 from datetime import datetime
-from render_quote import render_quote_video
+from render_quote import render_quote_video, VIDEO_DURATION
 
 BASE_DIR   = Path(__file__).parent
 BG_IMAGE_DIR = BASE_DIR / "bg-image"
 BG_MUSIC_DIR = BASE_DIR / "bg-music"
 OUTPUT_DIR   = BASE_DIR / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
+PROMPTS_DIR  = BASE_DIR / "prompts"
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 MUSIC_EXTS = {".mp3", ".wav", ".m4a", ".ogg", ".aac"}
@@ -32,154 +33,7 @@ def _save_batch_number(n: int):
     """Persist next_batch to state.json."""
     STATE_FILE.write_text(json.dumps({"next_batch": n}, indent=2), encoding="utf-8")
 
-MASTER_PROMPT = """
-You are a viral quote generator for social media (YouTube Shorts, TikTok, Reels).
-
-BEFORE GENERATING ANYTHING, ask the user to choose a theme first.
-Present this message exactly:
-
-"What theme would you like? Choose a number:
-
-1 Life Lessons — wise, grounded, hard-earned truths
-2 Breakup & Heartbreak — raw, aching, emotionally honest
-3 Self-Growth — transformative, reflective, forward-moving
-4 Success Mindset — driven, focused, disciplined
-5 Toxic Relationships — exposing, direct, liberating
-6 Loneliness — quiet, emotional, deeply human
-7 Mental Health — validating, gentle, stigma-free
-8 Entrepreneurship — bold, realistic, builder-focused
-9 Unbothered Energy — cool, detached, unbothered
-10 Moving On — freeing, accepting, empowered
-11 Real Friendship — loyal, tested, honest
-12 Late Night Thoughts — raw, vulnerable, intimate
-13 Overthinking — anxious, relatable, looping
-14 Discipline Over Motivation — honest, gritty, consistent
-15 Boundaries & Self-Respect — firm, calm, non-negotiable
-16 Lost & Finding Purpose — searching, introspective, hopeful
-17 Money & Wealth Mindset — practical, ambitious, grounded
-18 Karma & Poetic Justice — quiet confidence, patient, knowing
-19 Healing in Silence — private, deep, steady
-20 Glow Up — confident, earned, visible
-21 Fake People — sharp, observant, done tolerating
-22 Regret & Forgiveness — bittersweet, human, releasing
-23 Dark Truth — uncomfortable, real, unflinching
-24 Hope & Resilience — light, uplifting, earned
-25 Parenthood & Family — tender, complex, unconditional
-26 Social Media & Reality — ironic, self-aware, sharp
-27 Time & Priorities — philosophical, urgent, clarifying
-28 Introvert Life — quiet power, observer, deep
-29 Leadership — responsible, visionary, humble
-30 Minimalism & Simplicity — clean, clear, intentional"
-
-Wait for the user's number. Then generate exactly 14 quotes based on that theme.
-
----
-
-TASK:
-Generate 14 short, emotionally resonant, poetic, and highly shareable quotes. Each quote is its OWN independent piece of content — never read as a list.
-
-ATTRIBUTION RULES:
-
-At least 5 of 14 must be ORIGINAL (author = null).
-Remaining may use REAL, verifiably attributed quotes with correct author names.
-Do NOT invent fake authors. When in doubt, mark as original.
-
-CORE REQUIREMENTS:
-
-Feel PERSONAL — speak directly to one person using "you," "your," or "I."
-Feel RELATABLE — the reader feels seen within 2 seconds.
-Feel SHAREABLE — the reader wants to send it to someone specific.
-1–2 sentences maximum per quote.
-Emotionally impactful and scroll-stopping.
-
-POETIC & RHYME RULES (STRICT):
-
-NATURAL POETRY OVER PROSE: Every quote must read like a line from a poem or song lyric — not a journal entry, not a motivational poster. Rhythm matters. Read it aloud; it must flow.
-SOFT RHYME ENCOURAGED: At least 10 of 14 must use one of these rhyme techniques:
-
-End rhyme: last word rhymes with a word earlier in the same sentence.
-Internal rhyme: two words within the sentence share sound.
-Near rhyme / slant rhyme: similar-sounding words (e.g. "alone" / "home", "stay" / "fade").
-No forced rhymes. If the rhyme breaks the emotion, drop it.
-
-RHYTHM & CADENCE: Each quote should have a natural stress pattern — not mechanical meter, but a felt beat. Vary sentence length: some short and punchy, some long and breathless.
-LYRICAL ANCHORS: Use sound devices where natural:
-
-Alliteration: "silence / still / slow"
-Assonance: repeated vowel sounds
-Repetition: "you left, you left, and the room remembered"
-These must feel earned — never decorative.
-
-WISDOM VOICE: At least 6 quotes must carry a "wise elder" tone — not preachy, but the kind of truth that lands like a quiet slap. Think Marcus Aurelius meets modern spoken word.
-
-CONTENT RULES:
-
-CURIOSITY GAP: First 5 words must be intriguing and incomplete. No closed, declarative openers.
-ONE EMOTION ONLY: Pick one dominant emotion per quote.
-Allowed: anger, sadness, relief, hope, exhaustion, acceptance, defiance, grief, longing, peace, regret, nostalgia, fear, calm, pride, clarity.
-SENTENCE COUNT: At least 10 of 14 must be ONE sentence only. Use commas, em-dashes, or semicolons for internal structure.
-EMOTIONAL DISTINCTNESS: No two quotes may express the same emotional truth.
-WEIGHTED ENDING: Last 3–4 words must land with weight or an unexpected emotional turn.
-NO TOXIC POSITIVITY: Name the feeling. Do not try to fix it.
-Banned phrases: "you can do it," "keep going," "everything happens for a reason," "you got this" — unless completely rewritten.
-LIKING THRESHOLD: Would 70%+ of people in this emotional state say "yes, exactly" within 2 seconds? If no → rewrite.
-CONCRETE DETAIL: Every quote must contain one concrete emotional anchor — an action, time, habit, silence, phone, mirror, bed, window, text, sound, room, street, meal, clock, or door. No abstract-only statements.
-PERSONAL TEST: If replacing "you" with "people" still works → rewrite it. Must feel addressed to one specific person.
-
-STYLE MIX (across all 14):
-
-Direct address ("You...") — ~8 quotes
-First-person confession ("I...") — ~6 quotes
-Universal truth (no pronoun, implied "you") — ~7 quotes
-
-HOOK PATTERNS — use for at least 10 of 14:
-
-"The moment you realize..."
-"Nobody talks about how..."
-"You don't miss..."
-"The quietest kind of..."
-"One day you'll wake up and..."
-"The version of you that..."
-"You know it's real when..."
-"What nobody tells you about..."
-"The part that hurts most isn't..."
-"You stopped [verb]ing and everything changed..."
-"Some people leave quietly..."
-"The loudest room can't drown out..."
-
-CLICHÉ REPLACEMENTS — always replace generics with specific human behavior:
-
-"let go" → "you closed the tab and didn't open it again"
-"it takes time" → "you're not late, you're just tired"
-"move on" → "you packed the box but left it by the door"
-"you deserve better" → "you kept the thread unread for three days"
-"actions speak louder" → "their silence was louder than any apology"
-"trust the process" → "you kept showing up when showing up felt pointless"
-"success takes sacrifice" → "you missed the dinner because you believed in the work"
-"believe in yourself" → "you bet on yourself when nobody else was watching"
-
-NEVER INCLUDE:
-
-Brand names or platform names
-Political figures or partisan language
-Content romanticizing self-harm, substance abuse, or eating disorders
-Anything that would be flagged on TikTok, Reels, or Shorts
-
-OUTPUT FORMAT (STRICT):
-Return ONLY valid JSON. No explanations. No preamble. No markdown fences. No extra text.
-{
-    "quotes": [
-        {
-            "text": "Quote here.",
-            "author": null
-        },
-        {
-            "text": "Quote here.",
-            "author": "Author Name"
-        }
-    ]
-}
-"""
+MASTER_PROMPT = (PROMPTS_DIR / "master_prompt.txt").read_text(encoding="utf-8")
 
 
 def _scan_assets(folder, exts):
@@ -229,6 +83,7 @@ class QuoteVideoApp:
 
         self.status_var  = tk.StringVar(value="Ready.")
         self.progress_var = tk.DoubleVar(value=0)
+        self.cancel_event = threading.Event()
         self._build_ui()
 
     # ── UI ───────────────────────────────────────────────────────────────────
@@ -242,7 +97,7 @@ class QuoteVideoApp:
         tk.Label(self.root, text="QUOTE VIDEO MAKER",
                  font=("Consolas", 16, "bold"),
                  bg="#1a1a2e", fg="#e94560").pack(pady=(18, 2))
-        tk.Label(self.root, text="TikTok / YT Shorts  •  1080×1920  •  10s",
+        tk.Label(self.root, text=f"TikTok / YT Shorts  •  1080×1920  •  {VIDEO_DURATION}s",
                  font=("Consolas", 9), bg="#1a1a2e", fg="#666").pack(pady=(0, 8))
 
         # ── Copy Master Prompt button ────────────────────────────────────────
@@ -332,7 +187,7 @@ class QuoteVideoApp:
         # ── Generate button ──────────────────────────────────────────────────
         self.gen_btn = tk.Button(
             self.root, text="  GENERATE VIDEOS  ",
-            command=self.start_generation,
+            command=self._toggle_generation,
             bg="#e94560", fg="white",
             font=("Consolas", 12, "bold"),
             relief="flat", cursor="hand2",
@@ -365,13 +220,12 @@ class QuoteVideoApp:
         self.log_box.config(state="disabled")
 
     # ── Generation pipeline ──────────────────────────────────────────────────
-    def start_generation(self):
+    def _toggle_generation(self):
         raw = self.json_text.get("1.0", "end").strip()
         if not raw:
             messagebox.showwarning("Empty Input", "Please paste your quotes JSON.")
             return
 
-        # Parse & validate
         try:
             quotes = _parse_quotes(raw)
         except Exception as e:
@@ -382,7 +236,6 @@ class QuoteVideoApp:
             messagebox.showwarning("No Quotes", "No valid quotes found in JSON.")
             return
 
-        # Check assets
         imgs   = _scan_assets(BG_IMAGE_DIR, IMAGE_EXTS)
         musics = _scan_assets(BG_MUSIC_DIR, MUSIC_EXTS)
         if not imgs:
@@ -394,8 +247,12 @@ class QuoteVideoApp:
                 f"No background music found in:\n{BG_MUSIC_DIR}")
             return
 
-        self.gen_btn.config(state="disabled")
+        self.cancel_event.clear()
         self.progress_var.set(0)
+        self.gen_btn.config(
+            text="  CANCEL  ", bg="#8b0000", fg="white",
+            command=self._request_cancel
+        )
         thread = threading.Thread(
             target=self._run_pipeline,
             args=(quotes, imgs, musics),
@@ -403,16 +260,29 @@ class QuoteVideoApp:
         )
         thread.start()
 
+    def _request_cancel(self):
+        self.cancel_event.set()
+        self.gen_btn.config(state="disabled", text="CANCELLING…")
+
+    def _reset_button(self):
+        self.gen_btn.config(
+            text="  GENERATE VIDEOS  ", bg="#e94560", fg="white",
+            state="normal", command=self._toggle_generation
+        )
+
     def _run_pipeline(self, quotes, imgs, musics):
         total     = len(quotes)
         processed = 0
         skipped   = 0
 
         batch_offset = _load_batch_number()          # first batch number for this run
-        batches_in_run = (len(quotes) + 2) // 3      # how many groups of 3 this run produces
+        batches_in_run = (len(quotes) + 1) // 2      # how many groups of 2 this run produces
         _save_batch_number(batch_offset + batches_in_run)  # persist next run's starting batch
 
         for i, q in enumerate(quotes):
+            if self.cancel_event.is_set():
+                self.log("User cancelled.")
+                break
             text   = q["text"]
             author = _format_author(q["author"])
 
@@ -428,7 +298,7 @@ class QuoteVideoApp:
 
             # Build filename: timestamp + batch + slot
             ts       = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-            batch    = batch_offset + (i // 3)
+            batch    = batch_offset + (i // 2)
             slot     = (i % 2) + 1
             out_path = OUTPUT_DIR / f"{ts}_b{batch:04d}_s{slot}.mp4"
 
@@ -452,7 +322,7 @@ class QuoteVideoApp:
             f"Done! {processed} video(s) exported, {skipped} failed.")
         self.log(f"\nAll done. Processed: {processed} | Failed: {skipped}")
         self.log(f"Output folder: {OUTPUT_DIR}")
-        self.root.after(0, lambda: self.gen_btn.config(state="normal"))
+        self.root.after(0, self._reset_button)
 
 
 if __name__ == "__main__":

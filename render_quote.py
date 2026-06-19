@@ -1,39 +1,68 @@
+import json
 import os
-import tempfile
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from moviepy.editor import (
-    AudioFileClip,
-    ImageClip,
-    ImageSequenceClip,
-    concatenate_videoclips,
-)
+from moviepy.editor import AudioFileClip, ImageSequenceClip
 
-# ── Constants ────────────────────────────────────────────────────────────────
-VIDEO_WIDTH  = 1080
-VIDEO_HEIGHT = 1920
-VIDEO_FPS    = 24
-VIDEO_DURATION = 5  # seconds
+# ── Config ───────────────────────────────────────────────────────────────────
+DEFAULT_CONFIG = {
+    "video": {
+        "width": 1080,
+        "height": 1920,
+        "fps": 24,
+        "duration": 5,
+        "typing_duration": 2.0,
+    },
+    "fonts": {
+        "quote_size": 68,
+        "author_size": 42,
+        "line_spacing": 1.45,
+        "author_gap": 40,
+    },
+    "visual": {
+        "shadow_offset": 3,
+        "dark_overlay_opacity": 110,
+        "zoom_start": 1.0,
+        "zoom_end": 1.10,
+        "pad_left": 60,
+        "right_button_margin": 200,
+    },
+}
 
-QUOTE_FONT_SIZE  = 68
-AUTHOR_FONT_SIZE = 42
-LINE_SPACING = 1.45
-AUTHOR_GAP   = 40
-SHADOW_OFFSET = 3
+def _load_config():
+    config_path = Path(__file__).parent / "config.json"
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            user_config = json.load(f)
+    except Exception:
+        user_config = {}
+    config = {}
+    for section, defaults in DEFAULT_CONFIG.items():
+        config[section] = {**defaults, **(user_config.get(section) or {})}
+    return config
 
-# Typewriter timing
-TYPING_DURATION = 2.0  # seconds to type all words
-HOLD_DURATION = VIDEO_DURATION - TYPING_DURATION  # ~3 seconds
+CONFIG = _load_config()
 
-# Ken Burns zoom
-ZOOM_START = 1.0
-ZOOM_END = 1.10  # 10% zoom over full duration
+VIDEO_WIDTH   = CONFIG["video"]["width"]
+VIDEO_HEIGHT  = CONFIG["video"]["height"]
+VIDEO_FPS     = CONFIG["video"]["fps"]
+VIDEO_DURATION = CONFIG["video"]["duration"]
+TYPING_DURATION = CONFIG["video"]["typing_duration"]
+HOLD_DURATION = VIDEO_DURATION - TYPING_DURATION
 
-# Safe zone for platform buttons (right side)
-RIGHT_BUTTON_MARGIN = 200
-PAD_LEFT  = 60
+QUOTE_FONT_SIZE  = CONFIG["fonts"]["quote_size"]
+AUTHOR_FONT_SIZE = CONFIG["fonts"]["author_size"]
+LINE_SPACING     = CONFIG["fonts"]["line_spacing"]
+AUTHOR_GAP       = CONFIG["fonts"]["author_gap"]
+
+SHADOW_OFFSET = CONFIG["visual"]["shadow_offset"]
+ZOOM_START    = CONFIG["visual"]["zoom_start"]
+ZOOM_END      = CONFIG["visual"]["zoom_end"]
+PAD_LEFT      = CONFIG["visual"]["pad_left"]
+RIGHT_BUTTON_MARGIN = CONFIG["visual"]["right_button_margin"]
+DARK_OVERLAY_OPACITY = CONFIG["visual"]["dark_overlay_opacity"]
 PAD_RIGHT = RIGHT_BUTTON_MARGIN + 40
 
 FONT_PATHS_BOLD = [
@@ -70,9 +99,25 @@ def _wrap_text(text, font, max_width, draw):
         lines.append(current)
     return lines or [text]
 
-def _split_into_words_per_line(lines):
-    """Convert list of text lines into list of word lists per line."""
-    return [[word for word in line.split()] for line in lines]
+def _precompute_text_structure(quote_text):
+    full_wrapped_lines = []
+    words_with_positions = []
+
+    quote_lines = quote_text.split('\n') if '\n' in quote_text else [quote_text]
+    font_quote = _get_font(QUOTE_FONT_SIZE, bold=True)
+    max_w = VIDEO_WIDTH - PAD_LEFT - PAD_RIGHT
+    dummy = Image.new("RGB", (1, 1))
+    draw = ImageDraw.Draw(dummy)
+
+    for line in quote_lines:
+        wrapped = _wrap_text(line, font_quote, max_w, draw)
+        full_wrapped_lines.extend(wrapped)
+
+    for line_idx, line in enumerate(full_wrapped_lines):
+        for word in line.split():
+            words_with_positions.append((word, line_idx))
+
+    return full_wrapped_lines, words_with_positions
 
 def _apply_zoom(bg_img, progress):
     """
@@ -93,47 +138,27 @@ def _apply_zoom(bg_img, progress):
 def _load_bg(bg_path):
     img = Image.open(bg_path).convert("RGB")
     img = img.resize((VIDEO_WIDTH, VIDEO_HEIGHT), Image.LANCZOS)
-    dark = Image.new("RGBA", img.size, (0, 0, 0, 110))
+    dark = Image.new("RGBA", img.size, (0, 0, 0, DARK_OVERLAY_OPACITY))
     img = img.convert("RGBA")
     img = Image.alpha_composite(img, dark)
     return img.convert("RGB")
 
-def _build_quote_frame_with_reveal(bg_img, quote_lines, author_text, reveal_word_count):
-    """
-    Render a single frame showing only first N words of the quote.
-    quote_lines: list of strings, each line fully typed but we'll reveal by word count.
-    """
-    frame = bg_img.copy().convert("RGBA")
-    draw = ImageDraw.Draw(frame)
-    
+def _render_text_layer(full_wrapped_lines, words_with_positions, reveal_count, author_text):
+    text_layer = Image.new("RGBA", (VIDEO_WIDTH, VIDEO_HEIGHT), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(text_layer)
+
     font_quote = _get_font(QUOTE_FONT_SIZE, bold=True)
     font_author = _get_font(AUTHOR_FONT_SIZE, bold=False)
-    
     max_w = VIDEO_WIDTH - PAD_LEFT - PAD_RIGHT
     safe_center_x = PAD_LEFT + max_w // 2
-    
-    # Wrap quote lines fully (word wrap based on max width)
-    full_wrapped_lines = []
-    for line in quote_lines:
-        wrapped = _wrap_text(line, font_quote, max_w, draw)
-        full_wrapped_lines.extend(wrapped)
-    
-    # Flatten all words across lines with position tracking
-    words_with_positions = []  # (word, line_index)
-    for line_idx, line in enumerate(full_wrapped_lines):
-        for word in line.split():
-            words_with_positions.append((word, line_idx))
-    
-    # Truncate to reveal count
-    visible_words = words_with_positions[:reveal_word_count]
+
+    visible_words = words_with_positions[:reveal_count]
     if not visible_words:
-        return np.array(frame.convert("RGB"))
-    
-    # Reconstruct visible lines
+        return np.array(text_layer)
+
     visible_lines = []
     current_line_words = []
     last_line_idx = visible_words[0][1]
-    
     for word, line_idx in visible_words:
         if line_idx != last_line_idx:
             if current_line_words:
@@ -144,20 +169,17 @@ def _build_quote_frame_with_reveal(bg_img, quote_lines, author_text, reveal_word
             current_line_words.append(word)
     if current_line_words:
         visible_lines.append(' '.join(current_line_words))
-    
-    # Calculate vertical positions
+
     line_h = int(QUOTE_FONT_SIZE * LINE_SPACING)
-    total_q_h = line_h * len(full_wrapped_lines)  # Use full height for centering
-    
+    total_q_h = line_h * len(full_wrapped_lines)
+
     a_h = 0
     if author_text:
         a_bbox = draw.textbbox((0, 0), author_text, font=font_author)
         a_h = a_bbox[3] - a_bbox[1]
-    
     block_h = total_q_h + (AUTHOR_GAP + a_h if author_text else 0)
     y = (VIDEO_HEIGHT - block_h) // 2
-    
-    # Draw visible quote lines
+
     for line in visible_lines:
         bbox = draw.textbbox((0, 0), line, font=font_quote)
         lw = bbox[2] - bbox[0]
@@ -166,133 +188,61 @@ def _build_quote_frame_with_reveal(bg_img, quote_lines, author_text, reveal_word
                   font=font_quote, fill=(0, 0, 0, 180))
         draw.text((x, y), line, font=font_quote, fill=(255, 255, 255, 255))
         y += line_h
-    
-    # Draw author (only if all quote words are visible)
-    if author_text and reveal_word_count >= len(words_with_positions):
+
+    if author_text and reveal_count >= len(words_with_positions):
         y = (VIDEO_HEIGHT - block_h) // 2 + total_q_h + AUTHOR_GAP
         a_bbox = draw.textbbox((0, 0), author_text, font=font_author)
         aw = a_bbox[2] - a_bbox[0]
         ax = safe_center_x - aw // 2
         draw.text((ax + SHADOW_OFFSET, y + SHADOW_OFFSET), author_text,
                   font=font_author, fill=(0, 0, 0, 160))
-        draw.text((ax, y), author_text, font=font_author, fill=(210, 210, 210, 255))
-    
-    return np.array(frame.convert("RGB"))
+        draw.text((ax, y), author_text, font=font_author,
+                  fill=(210, 210, 210, 255))
 
-def _generate_typewriter_frames(bg_img, quote_text, author_text):
-    """
-    Generate list of frames for typewriter animation.
-    Returns list of (frame_array, duration_seconds) for each step.
-    """
-    # Split quote into lines for structure
-    quote_lines = quote_text.split('\n') if '\n' in quote_text else [quote_text]
-    
-    # Count total words
-    words = quote_text.split()
-    total_words = len(words)
-    
-    if total_words == 0:
-        return []
-    
-    # Each step reveals 1 word
-    frames = []
-    
+    return np.array(text_layer)
+
+def _composite_text_on_bg(bg_pil, text_layer_np):
+    bg = bg_pil.convert("RGBA")
+    text = Image.fromarray(text_layer_np)
+    composited = Image.alpha_composite(bg, text)
+    return np.array(composited.convert("RGB"))
+
+def _get_typewriter_timing(total_words):
+    timing = []
     for reveal_count in range(1, total_words + 1):
-        # Calculate frame duration: each word gets equal time within TYPING_DURATION
-        frame_duration = TYPING_DURATION / total_words
-        frame = _build_quote_frame_with_reveal(bg_img, quote_lines, author_text, reveal_count)
-        frames.append((frame, frame_duration))
-    
-    # Add hold frames (same as final frame)
-    hold_frame = _build_quote_frame_with_reveal(bg_img, quote_lines, author_text, total_words)
-    frames.append((hold_frame, HOLD_DURATION))
-    
-    return frames
+        timing.append((reveal_count, TYPING_DURATION / total_words))
+    timing.append((total_words, HOLD_DURATION))
+    return timing
 
 def render_quote_video(quote_text, author_text, bg_image_path, bg_music_path, output_path):
-    """
-    Render 5-second portrait video with word-level typewriter animation
-    and Ken Burns zoom on background.
-    """
     bg_img = _load_bg(bg_image_path)
-    
-    # Generate all frames with typewriter progression
-    typewriter_frames = _generate_typewriter_frames(bg_img, quote_text, author_text)
-    
-    if not typewriter_frames:
-        raise ValueError("No frames generated — quote text may be empty")
-    
-    # Write frames to temporary directory
-    temp_dir = tempfile.mkdtemp()
-    frame_paths = []
-    
-    for idx, (frame_array, duration) in enumerate(typewriter_frames):
-        # Apply Ken Burns zoom per frame based on cumulative time
-        # For simplicity, we'll handle zoom in MoviePy via a resize effect
-        # But PIL zoom per frame is expensive; better to composite after
-        frame_img = Image.fromarray(frame_array)
-        frame_path = os.path.join(temp_dir, f"frame_{idx:04d}.png")
-        frame_img.save(frame_path)
-        frame_paths.append(frame_path)
-    
-    # Create clips with correct durations
-    clips = []
-    for idx, (frame_path, (_, duration)) in enumerate(zip(frame_paths, typewriter_frames)):
-        clip = ImageClip(frame_path).set_duration(duration)
-        # Apply Ken Burns zoom using MoviePy's resize effect
-        # Progress = start + (end - start) * (time_in_clip / total_time)
-        # We'll apply to each clip with its midpoint time
-        clips.append(clip)
-    
-    # Concatenate all clips
-    video_clip = concatenate_videoclips(clips, method="compose")
-    
-    # Apply Ken Burns zoom as a single effect across entire video
-    def ken_burns_effect(get_frame, t):
-        """Apply zoom based on global time t (0 to VIDEO_DURATION)."""
-        frame = get_frame(t)
-        progress = t / VIDEO_DURATION
-        scale = ZOOM_START + (ZOOM_END - ZOOM_START) * progress
-        
-        h, w = frame.shape[:2]
-        new_h, new_w = int(h * scale), int(w * scale)
-        
-        # Resize using MoviePy's built-in (approximate)
-        from moviepy.video.fx.resize import resize
-        resized = resize(lambda t: frame, newsize=(new_w, new_h))
-        # This is complex; simpler: pre-render zoomed frames
-        return frame
-        
-    # Alternative: pre-render zoomed frames (more reliable)
-    # Regenerate frames with zoom applied per frame
+
+    full_wrapped_lines, words_with_positions = _precompute_text_structure(quote_text)
+    total_words = len(words_with_positions)
+    if total_words == 0:
+        raise ValueError("No words in quote text")
+
+    text_layers = {}
+    for rc in range(1, total_words + 1):
+        text_layers[rc] = _render_text_layer(
+            full_wrapped_lines, words_with_positions, rc, author_text)
+
+    timing = _get_typewriter_timing(total_words)
     zoomed_frames = []
-    total_frames = sum(int(dur * VIDEO_FPS) for _, dur in typewriter_frames)
     time_per_frame = 1.0 / VIDEO_FPS
-    current_time = 0
-    
-    for frame_array, duration in typewriter_frames:
+    current_time = 0.0
+
+    for reveal_count, duration in timing:
+        text_layer = text_layers[reveal_count]
         frame_duration_frames = int(duration * VIDEO_FPS)
         for frame_idx in range(frame_duration_frames):
             t = current_time + frame_idx * time_per_frame
             progress = min(t / VIDEO_DURATION, 1.0)
-            
-            # Apply zoom to background for this specific frame
             zoomed_bg = _apply_zoom(bg_img, progress)
-            # Re-render quote on zoomed background with same reveal count
-            # This is expensive but accurate
-            quote_lines = quote_text.split('\n') if '\n' in quote_text else [quote_text]
-            words = quote_text.split()
-            reveal_count = min(len(words), int((t / TYPING_DURATION) * len(words)) + 1)
-            if reveal_count > len(words):
-                reveal_count = len(words)
-            elif t > TYPING_DURATION:
-                reveal_count = len(words)
-            
-            frame = _build_quote_frame_with_reveal(zoomed_bg, quote_lines, author_text, reveal_count)
+            frame = _composite_text_on_bg(zoomed_bg, text_layer)
             zoomed_frames.append(frame)
         current_time += duration
-    
-    # Use zoomed frames directly
+
     final_clip = ImageSequenceClip(zoomed_frames, fps=VIDEO_FPS)
     
     # Audio handling (unchanged)
@@ -316,15 +266,5 @@ def render_quote_video(quote_text, author_text, bg_image_path, bg_music_path, ou
         logger=None,
     )
     
-    # Cleanup
     audio.close()
     final_clip.close()
-    for f in frame_paths:
-        try:
-            os.remove(f)
-        except:
-            pass
-    try:
-        os.rmdir(temp_dir)
-    except:
-        pass
